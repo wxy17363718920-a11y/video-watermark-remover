@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="免费、安全的多场景 AI 大模型工作台：提示词优化、文章总结、中英互译、代码审查与结构化提取。" />
+  <title>AI 超级工作台 - 在线大模型智能助手</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>" />
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
+  <style>
+    :root {
+      --bg: #f4f6f9;
+      --card: #ffffff;
+      --surface: #fafafa;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --primary-soft: #eff6ff;
+      --border: #e5e7eb;
+      --danger: #dc2626;
+      --code-bg: #1e293b;
+    }
+    body.dark {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --surface: #0f172a;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --primary: #3b82f6;
+      --primary-hover: #60a5fa;
+      --primary-soft: #1e3a8a44;
+      --border: #334155;
+      --code-bg: #020617;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: var(--bg); color: var(--text); line-height: 1.6; transition: background 0.2s, color 0.2s;
+    }
+    .container { max-width: 1020px; margin: 20px auto; padding: 0 16px 40px; }
+    header {
+      display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;
+      margin-bottom: 18px;
+    }
+    h1 { margin: 0; font-size: 1.4rem; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .badge { font-size: 0.75rem; background: var(--primary-soft); color: var(--primary); padding: 2px 10px; border-radius: 999px; font-weight: 600; border: 1px solid var(--border); }
+    .header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    .btn {
+      padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--card);
+      color: var(--text); cursor: pointer; font-size: 0.88rem; font-weight: 500; transition: all 0.15s;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn-primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .btn-primary:hover { background: var(--primary-hover); opacity: 1; }
+    .btn-danger { background: var(--danger); color: #fff; border-color: var(--danger); }
+    .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+    .card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+      padding: 16px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .presets { display: grid; grid-template-columns: repeat(auto-fill, minmax(152px, 1fr)); gap: 10px; margin-bottom: 16px; }
+    .preset-btn {
+      text-align: left; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border);
+      background: var(--card); color: var(--text); cursor: pointer; transition: all 0.15s;
+    }
+    .preset-btn:hover { border-color: var(--primary); background: var(--primary-soft); }
+    .preset-btn.active { border-color: var(--primary); background: var(--primary-soft); box-shadow: 0 0 0 2px rgba(37,99,235,0.2); }
+    .preset-title { font-weight: 600; font-size: 0.9rem; display: block; }
+    .preset-desc { font-size: 0.75rem; color: var(--muted); }
+
+    label { display: block; font-size: 0.84rem; font-weight: 600; margin-bottom: 6px; color: var(--muted); }
+    textarea, input, select {
+      width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px;
+      font-family: inherit; font-size: 0.95rem; outline: none; background: var(--surface); color: var(--text);
+    }
+    textarea:focus, input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(37,99,235,0.15); }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 640px) { .grid-2 { grid-template-columns: 1fr; } }
+
+    .toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+    .stats { font-size: 0.8rem; color: var(--muted); }
+    .switch-label { display: flex; align-items: center; gap: 6px; font-size: 0.86rem; cursor: pointer; margin: 0; color: var(--text); font-weight: 500; }
+    .switch-label input { width: auto; cursor: pointer; }
+
+    #settingsPanel { display: none; border-left: 4px solid var(--primary); }
+    .quick-providers { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+    .chip {
+      font-size: 0.78rem; padding: 4px 10px; border-radius: 999px; background: var(--surface);
+      color: var(--text); border: 1px solid var(--border); cursor: pointer;
+    }
+    .chip:hover { border-color: var(--primary); }
+
+    #outputArea {
+      min-height: 180px; max-height: 620px; overflow-y: auto; padding: 16px;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    }
+    #outputArea pre { background: var(--code-bg); color: #f8fafc; padding: 12px; border-radius: 8px; overflow-x: auto; }
+    #outputArea code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.88em; }
+    #outputArea p:first-child { margin-top: 0; }
+    .chat-turn-user {
+      background: var(--primary-soft); border-left: 3px solid var(--primary);
+      padding: 8px 12px; border-radius: 6px; margin: 12px 0 8px; font-size: 0.92rem; white-space: pre-wrap;
+    }
+    .chat-turn-ai { padding-bottom: 12px; border-bottom: 1px dashed var(--border); }
+    .error-msg { color: var(--danger); background: #fef2f2; padding: 10px; border-radius: 8px; border: 1px solid #fecaca; }
+
+    .history-bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+    #toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
+      background: #111827; color: #fff; padding: 8px 18px; border-radius: 999px; font-size: 0.86rem;
+      opacity: 0; pointer-events: none; transition: all 0.25s; z-index: 999; box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>⚡ AI 超级工作台 <span class="badge" id="serverStatus">加载中...</span></h1>
+      <div class="header-actions">
+        <button class="btn" id="themeBtn" onclick="toggleTheme()">🌙 深色</button>
+        <button class="btn" onclick="toggleSettings()">⚙️ 模型与密码设置</button>
+      </div>
+    </header>
+
+    <!-- 设置面板 -->
+    <div class="card" id="settingsPanel">
+      <div class="quick-providers">
+        <span style="font-size:0.82rem; color:var(--muted); align-self:center;">快速填充：</span>
+        <button class="chip" onclick="fillProvider('https://api.deepseek.com/v1', 'deepseek-chat')">DeepSeek</button>
+        <button class="chip" onclick="fillProvider('https://api.openai.com/v1', 'gpt-4o-mini')">OpenAI</button>
+        <button class="chip" onclick="fillProvider('https://dashscope.aliyuncs.com/compatible-mode/v1', 'qwen-plus')">通义千问</button>
+        <button class="chip" onclick="fillProvider('https://api.moonshot.cn/v1', 'moonshot-v1-8k')">Kimi</button>
+        <button class="chip" onclick="fillProvider('http://localhost:11434/v1', 'qwen2.5')">本地 Ollama</button>
+      </div>
+      <div class="grid-2">
+        <div>
+          <label>访问密码（若网站开启了密码保护）</label>
+          <input type="password" id="accessPassword" placeholder="输入站长设置的访问密码" oninput="saveSettings()" />
+        </div>
+        <div>
+          <label>模型名称 (Model)</label>
+          <input type="text" id="modelName" placeholder="例如：deepseek-chat / gpt-4o-mini" oninput="saveSettings()" />
+        </div>
+        <div>
+          <label>自定义 API Base URL（留空用服务端默认）</label>
+          <input type="text" id="customBaseUrl" placeholder="https://api.deepseek.com/v1" oninput="saveSettings()" />
+        </div>
+        <div>
+          <label>自带 API Key（可选，填了则不消耗站长额度）</label>
+          <input type="password" id="customApiKey" placeholder="sk-... (仅保存在本地浏览器)" oninput="saveSettings()" />
+        </div>
+      </div>
+      <div style="margin-top: 12px;">
+        <label>创造力 / 温度 (Temperature): <span id="tempVal">0.7</span></label>
+        <input type="range" id="temperature" min="0" max="1.5" step="0.1" value="0.7" oninput="document.getElementById('tempVal').innerText=this.value" />
+      </div>
+    </div>
+
+    <!-- 预设场景 -->
+    <div class="presets" id="presetContainer"></div>
+
+    <!-- 输入区 -->
+    <div class="card">
+      <div style="margin-bottom: 12px;">
+        <label>系统提示词 (System Prompt - 可自由微调)</label>
+        <textarea id="systemPrompt" rows="2"></textarea>
+      </div>
+      <div>
+        <label>输入内容 / 问题 <span style="color:var(--muted);font-weight:normal;">(Ctrl/Cmd + Enter 发送)</span></label>
+        <textarea id="userInput" rows="4" placeholder="粘贴需要总结的文章、待翻译的段落、需要审查的代码，或直接开始对话..."></textarea>
+      </div>
+      <div class="toolbar">
+        <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+          <label class="switch-label">
+            <input type="checkbox" id="multiTurnToggle" onchange="onModeChange()" />
+            💬 连续对话模式
+          </label>
+          <span class="stats" id="inputStats">输入约 0 字 / 预估 0 Tokens</span>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn" onclick="clearAll()">清空对话</button>
+          <button class="btn btn-danger" id="stopBtn" style="display:none;" onclick="stopGeneration()">⏹ 停止</button>
+          <button class="btn btn-primary" id="runBtn" onclick="runAI()">🚀 发送处理</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 输出区 -->
+    <div class="card">
+      <div class="toolbar" style="margin-top:0; margin-bottom:10px;">
+        <label style="margin:0;">输出结果</label>
+        <div style="display:flex; align-items:center; gap:12px;">
+          <span class="stats" id="outputStats">等待运行</span>
+          <button class="btn" onclick="copyOutput()">📋 复制最新结果</button>
+        </div>
+      </div>
+      <div id="outputArea"><span style="color:var(--muted);">处理结果将在这里实时流式呈现...</span></div>
+      <div class="history-bar" id="historyBar" style="display:none;">
+        <span class="stats">🕒 最近记录：</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    const PRESETS = [
+      {
+        id: "prompt_opt", title: "✨ 提示词优化器", desc: "把模糊需求变成专业Prompt", temp: 0.7,
+        system: "你是一位资深的提示词工程(Prompt Engineering)专家。请将用户给出的简短、模糊需求，重构为一个结构清晰、约束明确、可直接用于大模型的高质量提示词（包含：角色设定、核心任务、执行步骤、输出格式与约束条件）。最后简要说明优化思路。"
+      },
+      {
+        id: "summary", title: "📝 深度总结提炼", desc: "提取核心结论与待办", temp: 0.3,
+        system: "你是一个高效的信息提炼助手。请对用户提供的长文本、文章或会议记录进行结构化总结，严格按以下格式输出：\n1. 一句话核心结论\n2. 关键要点（分条列出，不超过5条）\n3. 行动建议 / 待办事项（如有）"
+      },
+      {
+        id: "translate", title: "🌐 信达雅互译", desc: "中英自然地道翻译润色", temp: 0.3,
+        system: "你是一位精通中英文的专业译者。如果用户输入中文，请翻译为自然地道的商务/技术英文；如果输入英文，请翻译为流畅优美的中文（信、达、雅）。同时在最后附带1-2个关键术语的解释或更地道的表达建议。"
+      },
+      {
+        id: "code_review", title: "💻 代码审查优化", desc: "排查Bug与性能重构", temp: 0.2,
+        system: "你是一位资深架构师。请审查用户提供的代码，指出潜在的 Bug、安全隐患或性能瓶颈，并给出优化后的完整代码及清晰的修改说明。"
+      },
+      {
+        id: "json_extract", title: "🧩 数据提取转JSON", desc: "杂乱文本转结构化数据", temp: 0.1,
+        system: "你是一个精准的数据提取引擎。请从用户提供的非结构化文本中提取关键实体与属性（如人名、时间、金额、事件、联系方式等），并仅输出格式规范的 JSON 代码块，不要编造原文不存在的信息。"
+      },
+      {
+        id: "free_chat", title: "💬 自由专业助手", desc: "通用问答与头脑风暴", temp: 0.7,
+        system: "你是一个严谨、实用且乐于助人的 AI 专家，请直接切中要害地回答用户问题。"
+      }
+    ];
+
+    let currentPresetId = PRESETS[0].id;
+    let latestAiReply = "";
+    let chatHistory = []; // 连续对话上下文 [{role, content}]
+    let abortController = null;
+    let maxInputChars = 15000;
+
+    function showToast(msg) {
+      const t = document.getElementById("toast");
+      t.innerText = msg;
+      t.classList.add("show");
+      setTimeout(() => t.classList.remove("show"), 2200);
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+
+    function renderMarkdown(text) {
+      if (typeof marked !== "undefined" && typeof DOMPurify !== "undefined") {
+        return DOMPurify.sanitize(marked.parse(text));
+      }
+      return escapeHtml(text).replace(/\n/g, "<br>");
+    }
+
+    function estimateTokens(text) {
+      if (!text) return 0;
+      const cnCount = (text.match(/[\u4e00-\u9fa5]/g) || []).length;
+      return Math.ceil(cnCount * 1.5 + (text.length - cnCount) * 0.35);
+    }
+
+    function toggleTheme() {
+      const isDark = document.body.classList.toggle("dark");
+      document.getElementById("themeBtn").innerText = isDark ? "☀️ 浅色" : "🌙 深色";
+      localStorage.setItem("ai_wb_dark", isDark ? "1" : "0");
+    }
+
+    function saveSettings() {
+      const data = {
+        accessPassword: document.getElementById("accessPassword").value,
+        modelName: document.getElementById("modelName").value,
+        customBaseUrl: document.getElementById("customBaseUrl").value,
+        customApiKey: document.getElementById("customApiKey").value,
+      };
+      localStorage.setItem("ai_wb_settings", JSON.stringify(data));
+    }
+
+    function loadLocalSettings() {
+      if (localStorage.getItem("ai_wb_dark") === "1") {
+        document.body.classList.add("dark");
+        document.getElementById("themeBtn").innerText = "☀️ 浅色";
+      }
+      try {
+        const saved = JSON.parse(localStorage.getItem("ai_wb_settings") || "{}");
+        if (saved.accessPassword) document.getElementById("accessPassword").value = saved.accessPassword;
+        if (saved.modelName) document.getElementById("modelName").value = saved.modelName;
+        if (saved.customBaseUrl) document.getElementById("customBaseUrl").value = saved.customBaseUrl;
+        if (saved.customApiKey) document.getElementById("customApiKey").value = saved.customApiKey;
+      } catch {}
+    }
+
+    function saveHistoryItem(promptText, replyText) {
+      if (!replyText) return;
+      try {
+        let list = JSON.parse(localStorage.getItem("ai_wb_history") || "[]");
+        list.unshift({
+          title: promptText.slice(0, 18) + (promptText.length > 18 ? "..." : ""),
+          prompt: promptText,
+          reply: replyText
+        });
+        list = list.slice(0, 8);
+        localStorage.setItem("ai_wb_history", JSON.stringify(list));
+        renderHistoryBar();
+      } catch {}
+    }
+
+    function renderHistoryBar() {
+      const bar = document.getElementById("historyBar");
+      let list = [];
+      try { list = JSON.parse(localStorage.getItem("ai_wb_history") || "[]"); } catch {}
+      if (!list.length) { bar.style.display = "none"; return; }
+      bar.style.display = "flex";
+      bar.innerHTML = `<span class="stats">🕒 最近记录：</span>` + list.map((item, idx) =>
+        `<button class="chip" onclick="restoreHistory(${idx})" title="${escapeHtml(item.prompt)}">${escapeHtml(item.title)}</button>`
+      ).join("");
+    }
+
+    function restoreHistory(idx) {
+      try {
+        const list = JSON.parse(localStorage.getItem("ai_wb_history") || "[]");
+        const item = list[idx];
+        if (!item) return;
+        document.getElementById("userInput").value = item.prompt;
+        latestAiReply = item.reply;
+        document.getElementById("outputArea").innerHTML = renderMarkdown(item.reply);
+        document.getElementById("outputStats").innerText = "已恢复历史记录";
+        updateInputStats();
+      } catch {}
+    }
+
+    function initPresets() {
+      const container = document.getElementById("presetContainer");
+      container.innerHTML = PRESETS.map(p => `
+        <button class="preset-btn ${p.id === currentPresetId ? 'active' : ''}" onclick="selectPreset('${p.id}')">
+          <span class="preset-title">${p.title}</span>
+          <span class="preset-desc">${p.desc}</span>
+        </button>
+      `).join("");
+      selectPreset(currentPresetId);
+    }
+
+    function selectPreset(id) {
+      currentPresetId = id;
+      const preset = PRESETS.find(p => p.id === id);
+      document.getElementById("systemPrompt").value = preset.system;
+      document.getElementById("temperature").value = preset.temp;
+      document.getElementById("tempVal").innerText = preset.temp;
+      document.querySelectorAll(".preset-btn").forEach((btn, idx) => {
+        btn.classList.toggle("active", PRESETS[idx].id === id);
+      });
+    }
+
+    function toggleSettings() {
+      const panel = document.getElementById("settingsPanel");
+      panel.style.display = panel.style.display === "block" ? "none" : "block";
+    }
+
+    function fillProvider(url, model) {
+      document.getElementById("customBaseUrl").value = url;
+      document.getElementById("modelName").value = model;
+      saveSettings();
+      showToast("已填充平台配置");
+    }
+
+    function updateInputStats() {
+      const text = document.getElementById("userInput").value;
+      document.getElementById("inputStats").innerText = `输入约 ${text.length} 字 / 预估 ${estimateTokens(text)} Tokens`;
+    }
+
+    document.getElementById("userInput").addEventListener("input", updateInputStats);
+    document.getElementById("userInput").addEventListener("keydown", (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") runAI();
+    });
+
+    function onModeChange() {
+      const isMulti = document.getElementById("multiTurnToggle").checked;
+      showToast(isMulti ? "已开启连续对话模式（保留上下文）" : "已切换为单次工具模式");
+      if (!isMulti) chatHistory = [];
+    }
+
+    function renderConversationView(currentReplyText) {
+      const isMulti = document.getElementById("multiTurnToggle").checked;
+      const outputArea = document.getElementById("outputArea");
+      if (!isMulti) {
+        outputArea.innerHTML = renderMarkdown(currentReplyText);
+      } else {
+        let html = chatHistory.map(m =>
+          m.role === "user"
+            ? `<div class="chat-turn-user">🧑 ${escapeHtml(m.content)}</div>`
+            : `<div class="chat-turn-ai">${renderMarkdown(m.content)}</div>`
+        ).join("");
+        if (currentReplyText) {
+          html += `<div class="chat-turn-ai">${renderMarkdown(currentReplyText)}</div>`;
+        }
+        outputArea.innerHTML = html;
+      }
+      outputArea.scrollTop = outputArea.scrollHeight;
+    }
+
+    async function runAI() {
+      const userInputEl = document.getElementById("userInput");
+      const userText = userInputEl.value.trim();
+      const systemText = document.getElementById("systemPrompt").value.trim();
+      const isMulti = document.getElementById("multiTurnToggle").checked;
+
+      if (!userText) return showToast("请先输入需要处理的内容");
+      if (userText.length > maxInputChars) return showToast(`输入超过上限（${maxInputChars} 字）`);
+
+      const runBtn = document.getElementById("runBtn");
+      const stopBtn = document.getElementById("stopBtn");
+      const outputArea = document.getElementById("outputArea");
+      const outputStats = document.getElementById("outputStats");
+
+      latestAiReply = "";
+      if (isMulti) {
+        chatHistory.push({ role: "user", content: userText });
+        userInputEl.value = "";
+        updateInputStats();
+        renderConversationView("正在思考...");
+      } else {
+        outputArea.innerHTML = `<span style="color:var(--muted);">正在连接大模型...</span>`;
+      }
+
+      runBtn.disabled = true;
+      stopBtn.style.display = "inline-block";
+      abortController = new AbortController();
+      const startTime = performance.now();
+
+      const messagesToSend = [
+        ...(systemText ? [{ role: "system", content: systemText }] : []),
+        ...(isMulti ? chatHistory : [{ role: "user", content: userText }])
+      ];
+
+      try {
+        const response = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: abortController.signal,
+          body: JSON.stringify({
+            messages: messagesToSend,
+            model: document.getElementById("modelName").value,
+            temperature: parseFloat(document.getElementById("temperature").value),
+            access_password: document.getElementById("accessPassword").value,
+            custom_api_key: document.getElementById("customApiKey").value,
+            custom_base_url: document.getElementById("customBaseUrl").value,
+          }),
+        });
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.detail || `请求失败 (${response.status})`);
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop();
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed || !trimmed.startsWith("data: ")) continue;
+            const dataStr = trimmed.slice(6);
+            if (dataStr === "[DONE]") continue;
+
+            let parsed;
+            try {
+              parsed = JSON.parse(dataStr);
+            } catch {
+              continue;
+            }
+            if (parsed.error) throw new Error(parsed.error);
+
+            const delta = parsed.choices?.[0]?.delta?.content;
+            if (delta) {
+              latestAiReply += delta;
+              renderConversationView(latestAiReply);
+              const elapsed = ((performance.now() - startTime) / 1000).toFixed(1);
+              outputStats.innerText = `耗时 ${elapsed}s · 约 ${latestAiReply.length} 字 / ${estimateTokens(latestAiReply)} Tokens`;
+            }
+          }
+        }
+
+        if (isMulti && latestAiReply) {
+          chatHistory.push({ role: "assistant", content: latestAiReply });
+        }
+        saveHistoryItem(userText, latestAiReply);
+      } catch (err) {
+        if (isMulti && chatHistory.length && chatHistory[chatHistory.length - 1].role === "user") {
+          if (latestAiReply) {
+            chatHistory.push({ role: "assistant", content: latestAiReply });
+          } else {
+            chatHistory.pop();
+          }
+        }
+        if (err.name === "AbortError") {
+          outputStats.innerText += " (已停止)";
+          showToast("已停止生成");
+        } else {
+          outputArea.innerHTML += `<div class="error-msg">❌ ${escapeHtml(err.message)}</div>`;
+          outputStats.innerText = "运行出错";
+          if (err.message.includes("密码") || err.message.includes("Key")) {
+            document.getElementById("settingsPanel").style.display = "block";
+          }
+        }
+      } finally {
+        runBtn.disabled = false;
+        stopBtn.style.display = "none";
+        abortController = null;
+      }
+    }
+
+    function stopGeneration() {
+      if (abortController) abortController.abort();
+    }
+
+    function clearAll() {
+      document.getElementById("userInput").value = "";
+      updateInputStats();
+      latestAiReply = "";
+      chatHistory = [];
+      document.getElementById("outputArea").innerHTML = `<span style="color:var(--muted);">处理结果将在这里实时流式呈现...</span>`;
+      document.getElementById("outputStats").innerText = "等待运行";
+    }
+
+    function copyOutput() {
+      if (!latestAiReply) return showToast("暂无可复制的内容");
+      navigator.clipboard.writeText(latestAiReply).then(() => showToast("已复制 Markdown 原文 ✅"));
+    }
+
+    async function initApp() {
+      loadLocalSettings();
+      initPresets();
+      renderHistoryBar();
+      try {
+        const res = await fetch("/api/config");
+        const cfg = await res.json();
+        maxInputChars = cfg.max_input_chars || 15000;
+        if (!document.getElementById("modelName").value && cfg.default_model) {
+          document.getElementById("modelName").value = cfg.default_model;
+        }
+        if (cfg.default_base_url) {
+          document.getElementById("customBaseUrl").placeholder = cfg.default_base_url;
+        }
+        const badge = document.getElementById("serverStatus");
+        if (cfg.has_server_key) {
+          badge.innerText = cfg.requires_password ? "🔒 密码保护模式" : "✅ 在线可用";
+        } else {
+          badge.innerText = "🔑 需填 API Key";
+          document.getElementById("settingsPanel").style.display = "block";
+        }
+      } catch {
+        document.getElementById("serverStatus").innerText = "⚠️ 后端未连接";
+      }
+    }
+
+    initApp();
+  </script>
+</body>
+</html>
